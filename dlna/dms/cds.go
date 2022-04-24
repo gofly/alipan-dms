@@ -63,6 +63,7 @@ func (s *contentDirectoryService) cdsObjectToUpnpavObject(cdsObject object, file
 		ID:         cdsObject.ID(),
 		Restricted: 1,
 		ParentID:   cdsObject.ParentID(),
+		Date:       upnpav.Timestamp{Time: fileInfo.ModTime()},
 	}
 	if fileInfo.IsDir() {
 		obj.Class = "object.container.storageFolder"
@@ -149,7 +150,6 @@ func didlLite(chardata string) string {
 func (s *contentDirectoryService) Handle(action string, argsXML []byte, r *http.Request) ([][2]string, error) {
 	host := r.Host
 	userAgent := r.UserAgent()
-	log.Printf("contentDirectoryService, action: %s, xml: %s, host: %s, userAgent: %s", action, string(argsXML), host, userAgent)
 	switch action {
 	case "GetSystemUpdateID":
 		return [][2]string{
@@ -168,7 +168,6 @@ func (s *contentDirectoryService) Handle(action string, argsXML []byte, r *http.
 		if err != nil {
 			return nil, upnp.Errorf(upnpav.NoSuchObjectErrorCode, err.Error())
 		}
-		log.Printf("obj: %+v, browse: %+v", obj, browse)
 		switch browse.BrowseFlag {
 		case "BrowseDirectChildren":
 			objs, err := s.readContainer(obj, host, userAgent)
@@ -190,63 +189,15 @@ func (s *contentDirectoryService) Handle(action string, argsXML []byte, r *http.
 			if err != nil {
 				return nil, err
 			}
-			s.Logger.Println(string(result))
 			return [][2]string{
 				{"Result", didlLite(string(result))},
 				{"NumberReturned", fmt.Sprint(len(objs))},
 				{"TotalMatches", fmt.Sprint(totalMatches)},
 				{"UpdateID", s.updateIDString()},
 			}, nil
-		// case "BrowseMetadata":
-		// 	fileInfo, err := os.Stat(obj.FilePath())
-		// 	if err != nil {
-		// 		if os.IsNotExist(err) {
-		// 			return nil, &upnp.Error{
-		// 				Code: upnpav.NoSuchObjectErrorCode,
-		// 				Desc: err.Error(),
-		// 			}
-		// 		}
-		// 		return nil, err
-		// 	}
-		// 	upnp, err := s.cdsObjectToUpnpavObject(obj, fileInfo, host, userAgent)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	buf, err := xml.Marshal(upnp)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	return [][2]string{
-		// 		{"Result", didl_lite(func() string { return string(buf) }())},
-		// 		{"NumberReturned", "1"},
-		// 		{"TotalMatches", "1"},
-		// 		{"UpdateID", s.updateIDString()},
-		// 	}, nil
 		default:
 			return nil, upnp.Errorf(upnp.ArgumentValueInvalidErrorCode, "unhandled browse flag: %v", browse.BrowseFlag)
 		}
-		// case "GetSearchCapabilities":
-		// 	return [][2]string{
-		// 		{"SearchCaps", ""},
-		// 	}, nil
-		// // Samsung Extensions
-		// case "X_GetFeatureList":
-		// 	// TODO: make it dependable on model
-		// 	// https://github.com/1100101/minidlna/blob/ca6dbba18390ad6f8b8d7b7dbcf797dbfd95e2db/upnpsoap.c#L2153-L2199
-		// 	return [][2]string{
-		// 		{"FeatureList", `<Features xmlns="urn:schemas-upnp-org:av:avs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:schemas-upnp-org:av:avs http://www.upnp.org/schemas/av/avs.xsd">
-		// 	<Feature name="samsung.com_BASICVIEW" version="1">
-		// 		<container id="0" type="object.item.audioItem"/> // "A"
-		// 		<container id="0" type="object.item.videoItem"/> // "V"
-		// 		<container id="0" type="object.item.imageItem"/> // "I"
-		// 	</Feature>
-		// </Features>`},
-		// 	}, nil
-		// case "X_SetBookmark":
-		// 	// just ignore
-		// 	return [][2]string{}, nil
-		// default:
-		// return nil, upnp.InvalidActionError
 	}
 	return nil, upnp.InvalidActionError
 }
@@ -265,7 +216,8 @@ func (o *object) FilePath() string {
 // Returns the ObjectID for the object. This is used in various ContentDirectory actions.
 func (o object) ID() string {
 	if !path.IsAbs(o.Path) {
-		log.Panicf("Relative object path: %s", o.Path)
+		log.Printf("Relative object path: %s", o.Path)
+		return "0"
 	}
 	if len(o.Path) == 1 {
 		return "0"

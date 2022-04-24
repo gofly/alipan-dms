@@ -178,7 +178,6 @@ func (s *Server) initServices() (err error) {
 
 func (s *Server) initMux(mux *http.ServeMux) {
 	mux.HandleFunc(rootDescPath, func(w http.ResponseWriter, r *http.Request) {
-		log.Println("request rootDesc")
 		w.Header().Set("content-type", `text/xml; charset="utf-8"`)
 		w.Header().Set("content-length", fmt.Sprint(len(s.rootDescXML)))
 		w.Header().Set("server", serverField)
@@ -461,7 +460,6 @@ func (s *Server) serviceControlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// AwoX/1.1 UPnP/1.0 DLNADOC/1.50
-	// log.Println(r.UserAgent())
 	w.Header().Set("Content-Type", `text/xml; charset="utf-8"`)
 	w.Header().Set("Ext", "")
 	w.Header().Set("Server", serverField)
