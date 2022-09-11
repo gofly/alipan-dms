@@ -8,6 +8,7 @@ import (
 
 	"github.com/anacrolix/log"
 
+	"github.com/gofly/alipan-dms/dlna/dmr"
 	"github.com/gofly/alipan-dms/dlna/dms"
 )
 
@@ -26,10 +27,34 @@ func main() {
 			inters = append(inters, i)
 		}
 	}
+
+	dmrServer := &dmr.Server{
+		FriendlyName: "媒体下载器",
+		Interfaces:   inters,
+		HTTPConn: func() net.Listener {
+			conn, err := net.Listen("tcp", ":8082")
+			if err != nil {
+				logger.Print(err)
+			}
+			return conn
+		}(),
+		NotifyInterval: time.Second * 5,
+		Logger:         logger.WithNames("dmr", "server"),
+	}
+	if err := dmrServer.Init(); err != nil {
+		logger.Printf("[FATAL] error initing dms server: %v", err)
+		os.Exit(1)
+	}
+	go func() {
+		if err := dmrServer.Run(); err != nil {
+			log.Printf("[FATAL] error runing dms server: %v", err)
+			os.Exit(1)
+		}
+	}()
 	dmsServer := &dms.Server{
-		FriendlyName:   "阿里云盘",
+		FriendlyName:   "余小胖的影院",
 		Interfaces:     inters,
-		RootObjectPath: "/",
+		RootObjectPath: "/01-影视剧",
 		WebdavURI:      webdavURI,
 		HTTPConn: func() net.Listener {
 			conn, err := net.Listen("tcp", ":8083")
