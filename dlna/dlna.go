@@ -1,9 +1,16 @@
 package dlna
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/gofly/alipan-dms/upnp"
 )
 
 const (
@@ -100,4 +107,27 @@ func (me NPTRange) String() (ret string) {
 		ret += me.End.String()
 	}
 	return
+}
+
+func MakeDeviceUuid(unique string) string {
+	h := md5.New()
+	if _, err := io.WriteString(h, unique); err != nil {
+		log.Printf("makeDeviceUuid write failed: %s", err)
+		return ""
+	}
+	buf := h.Sum(nil)
+	return upnp.FormatUUID(buf)
+}
+
+// Groups the service definition with its XML description.
+type Service struct {
+	upnp.Service
+	SCPD string
+}
+
+// UPnP SOAP service.
+type UPnPService interface {
+	Handle(action string, argsXML []byte, r *http.Request) (respArgs [][2]string, err error)
+	Subscribe(callback []*url.URL, timeoutSeconds int) (sid string, actualTimeout int, err error)
+	Unsubscribe(sid string) error
 }

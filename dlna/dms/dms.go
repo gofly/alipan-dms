@@ -2,10 +2,8 @@ package dms
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/xml"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -17,6 +15,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/log"
+	"github.com/gofly/alipan-dms/dlna"
 	"github.com/gofly/alipan-dms/soap"
 	"github.com/gofly/alipan-dms/ssdp"
 	"github.com/gofly/alipan-dms/upnp"
@@ -39,23 +38,8 @@ var (
 	rootDeviceModelName = fmt.Sprintf("%s %s", userAgentProduct, version.DmsVersion)
 )
 
-func makeDeviceUuid(unique string) string {
-	h := md5.New()
-	if _, err := io.WriteString(h, unique); err != nil {
-		log.Panicf("makeDeviceUuid write failed: %s", err)
-	}
-	buf := h.Sum(nil)
-	return upnp.FormatUUID(buf)
-}
-
-// Groups the service definition with its XML description.
-type service struct {
-	upnp.Service
-	SCPD string
-}
-
 // Exposed UPnP AV services.
-var services = []*service{
+var services = []*dlna.Service{
 	{
 		Service: upnp.Service{
 			ServiceType: "urn:schemas-upnp-org:service:ContentDirectory:1",
@@ -106,24 +90,11 @@ func init() {
 	}
 }
 
-func devices() []string {
-	return []string{
-		"urn:schemas-upnp-org:device:MediaServer:1",
-	}
-}
-
 func serviceTypes() (ret []string) {
 	for _, s := range services {
 		ret = append(ret, s.ServiceType)
 	}
 	return
-}
-
-// UPnP SOAP service.
-type UPnPService interface {
-	Handle(action string, argsXML []byte, r *http.Request) (respArgs [][2]string, err error)
-	Subscribe(callback []*url.URL, timeoutSeconds int) (sid string, actualTimeout int, err error)
-	Unsubscribe(sid string) error
 }
 
 type Server struct {
@@ -143,7 +114,7 @@ type Server struct {
 	closed         chan struct{}
 	ssdpStopped    chan struct{}
 	// The service SOAP handler keyed by service URN.
-	services       map[string]UPnPService
+	services       map[string]dlna.UPnPService
 	LogHeaders     bool
 	Logger         log.Logger
 	eventingLogger log.Logger
@@ -162,7 +133,7 @@ func (s *Server) initServices() (err error) {
 	if err != nil {
 		return
 	}
-	s.services = map[string]UPnPService{
+	s.services = map[string]dlna.UPnPService{
 		urn.Type: &contentDirectoryService{
 			Server: s,
 		},
@@ -204,7 +175,7 @@ func (s *Server) Init() (err error) {
 	if s.Interfaces == nil {
 		ifs, err := net.Interfaces()
 		if err != nil {
-			log.Print(err)
+			return err
 		}
 		var tmp []net.Interface
 		for _, if_ := range ifs {
@@ -217,7 +188,7 @@ func (s *Server) Init() (err error) {
 	}
 
 	s.httpServeMux = http.NewServeMux()
-	s.rootDeviceUUID = makeDeviceUuid(s.FriendlyName)
+	s.rootDeviceUUID = dlna.MakeDeviceUuid(s.FriendlyName)
 	s.rootDescXML, err = xml.MarshalIndent(
 		upnp.DeviceDesc{
 			NSDLNA:      "urn:schemas-dlna-org:device-1-0",
@@ -231,10 +202,8 @@ func (s *Server) Init() (err error) {
 				UDN:          s.rootDeviceUUID,
 				VendorXML: `
      <dlna:X_DLNACAP/>
-     <dlna:X_DLNADOC>DMS-1.50</dlna:X_DLNADOC>
-     <dlna:X_DLNADOC>M-DMS-1.50</dlna:X_DLNADOC>
-     <sec:ProductCap>smi,DCM10,getMediaInfo.sec,getCaptionInfo.sec</sec:ProductCap>
-     <sec:X_ProductCap>smi,DCM10,getMediaInfo.sec,getCaptionInfo.sec</sec:X_ProductCap>`,
+     <dlna:X_DLNADOC xmlns:dlna="urn:schemas-dlna-org:device-1-0">DMS-1.50</dlna:X_DLNADOC>
+     <dlna:X_DLNADOC>M-DMS-1.50</dlna:X_DLNADOC>`,
 				ServiceList: func() (ss []upnp.Service) {
 					for _, s := range services {
 						ss = append(ss, s.Service)
@@ -422,7 +391,7 @@ func (s *Server) soapActionResponse(sa upnp.SoapAction, actionRequestXML []byte,
 func xmlMarshalOrPanic(value interface{}) []byte {
 	ret, err := xml.MarshalIndent(value, "", "  ")
 	if err != nil {
-		log.Panicf("xmlMarshalOrPanic failed to marshal %v: %s", value, err)
+		log.Printf("xmlMarshalOrPanic failed to marshal %v: %s", value, err)
 	}
 	return ret
 }
@@ -447,7 +416,6 @@ func (s *Server) serviceControlHandler(w http.ResponseWriter, r *http.Request) {
 		// IPv6 addresses may have the form address%zone (e.g. ::1%eth0)
 		clientIp = clientIp[:zoneDelimiterIdx]
 	}
-
 	soapActionString := r.Header.Get("SOAPACTION")
 	soapAction, err := upnp.ParseActionHTTPHeader(soapActionString)
 	if err != nil {
@@ -474,6 +442,6 @@ func (s *Server) serviceControlHandler(w http.ResponseWriter, r *http.Request) {
 	bodyStr := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8" standalone="yes"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>%s</s:Body></s:Envelope>`, soapRespXML)
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(bodyStr)); err != nil {
-		log.Print(err)
+		s.Logger.Println(err)
 	}
 }

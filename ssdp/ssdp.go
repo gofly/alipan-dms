@@ -157,14 +157,14 @@ func (s *Server) Serve() (err error) {
 				}
 				panic(fmt.Sprint("unexpected addr type:", addr))
 			}()
-			if ip.IsLinkLocalUnicast() {
+			if ip.IsLinkLocalUnicast() || ip.To4() == nil {
 				// These addresses seem to confuse VLC. Possibly there's supposed to be a zone
 				// included in the address, but I don't see one.
 				continue
 			}
 			extraHdrs := [][2]string{
-				{"CACHE-CONTROL", fmt.Sprintf("max-age=%d", 5*s.NotifyInterval/2/time.Second)},
-				{"LOCATION", s.Location(ip)},
+				{"Cache-Control", fmt.Sprintf("max-age=%d", 5*s.NotifyInterval/2/time.Second)},
+				{"Location", s.Location(ip)},
 			}
 			s.notifyAll(aliveNTS, extraHdrs)
 		}
@@ -257,12 +257,12 @@ func (s *Server) handle(buf []byte, sender *net.UDPAddr) {
 		s.Logger.Println(err)
 		return
 	}
-	if req.Method != "M-SEARCH" || req.Header.Get("man") != `"ssdp:discover"` {
+	if req.Method != "M-SEARCH" || req.Header.Get("Man") != `"ssdp:discover"` {
 		return
 	}
 	var mx uint
 	if req.Header.Get("Host") == AddrString {
-		mxHeader := req.Header.Get("mx")
+		mxHeader := req.Header.Get("Mx")
 		i, err := strconv.ParseUint(mxHeader, 0, 0)
 		if err != nil {
 			s.Logger.Printf("Invalid mx header %q: %s", mxHeader, err)
@@ -282,7 +282,7 @@ func (s *Server) handle(buf []byte, sender *net.UDPAddr) {
 			}
 		}
 		return nil
-	}(req.Header.Get("st"))
+	}(req.Header.Get("St"))
 	for _, ip := range func() (ret []net.IP) {
 		addrs, err := s.Interface.Addrs()
 		if err != nil {
@@ -323,10 +323,10 @@ func (s *Server) makeResponse(ip net.IP, targ string, req *http.Request) (ret []
 		Request:    req,
 	}
 	for _, pair := range [...][2]string{
-		{"CACHE-CONTROL", fmt.Sprintf("max-age=%d", 5*s.NotifyInterval/2/time.Second)},
+		{"Cache-Control", fmt.Sprintf("max-age=%d", 5*s.NotifyInterval/2/time.Second)},
 		{"EXT", ""},
-		{"LOCATION", s.Location(ip)},
-		{"SERVER", s.Server},
+		{"Location", s.Location(ip)},
+		{"Server", s.Server},
 		{"ST", targ},
 		{"USN", s.usnFromTarget(targ)},
 	} {

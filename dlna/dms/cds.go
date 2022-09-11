@@ -35,7 +35,7 @@ func (s *contentDirectoryService) objectFromID(id string) (o object, err error) 
 		return
 	}
 	if o.Path == "0" {
-		o.Path = "/"
+		o.Path = s.RootObjectPath
 	}
 	o.Path = path.Clean(o.Path)
 	if !path.IsAbs(o.Path) {
@@ -210,7 +210,7 @@ type object struct {
 
 // Returns the actual local filesystem path for the object.
 func (o *object) FilePath() string {
-	return filepath.Join(o.RootObjectPath, filepath.FromSlash(o.Path))
+	return filepath.FromSlash(o.Path)
 }
 
 // Returns the ObjectID for the object. This is used in various ContentDirectory actions.
