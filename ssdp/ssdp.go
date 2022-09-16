@@ -309,6 +309,7 @@ func (s *Server) handle(buf []byte, sender *net.UDPAddr) {
 		for _, type_ := range types {
 			resp := s.makeResponse(ip, type_, req)
 			delay := time.Duration(rand.Int63n(int64(time.Second) * int64(mx)))
+			// log.Printf("delay: %s", delay)
 			s.delayedSend(delay, resp, sender)
 		}
 	}

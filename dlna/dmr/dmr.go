@@ -63,9 +63,6 @@ var services = []*dlna.Service{
 	},
 }
 
-type Renderer struct {
-}
-
 var startTime time.Time
 
 // Install handlers to serve SCPD for each UPnP service.
@@ -101,6 +98,8 @@ func serviceTypes() (ret []string) {
 
 type Server struct {
 	FriendlyName   string
+	Aria2RPCAddr   string
+	Aria2RPCToken  string
 	HTTPConn       net.Listener
 	Interfaces     []net.Interface
 	httpServeMux   *http.ServeMux
@@ -135,7 +134,8 @@ func (s *Server) initServices() (err error) {
 			Server: s,
 		},
 		urn1.Type: &avTransportService{
-			Server: s,
+			Server:       s,
+			Aria2Service: NewAria2Ctl(s.Aria2RPCAddr, s.Aria2RPCToken),
 		},
 		urn2.Type: &remoteControlService{
 			Server: s,
@@ -146,7 +146,6 @@ func (s *Server) initServices() (err error) {
 
 func (s *Server) initMux(mux *http.ServeMux) {
 	mux.HandleFunc(rootDescPath, func(w http.ResponseWriter, r *http.Request) {
-		log.Println(rootDescPath)
 		w.Header().Set("content-type", `text/xml; charset="utf-8"`)
 		w.Header().Set("content-length", fmt.Sprint(len(s.rootDescXML)))
 		w.Header().Set("server", serverField)
@@ -219,6 +218,7 @@ func (s *Server) Init() (err error) {
 	s.Logger.Println("HTTP srv on", s.HTTPConn.Addr())
 	s.initMux(s.httpServeMux)
 	s.ssdpStopped = make(chan struct{})
+
 	return nil
 }
 
@@ -343,6 +343,7 @@ func (s *Server) ssdpInterface(i net.Interface) {
 		Server:         serverField,
 		UUID:           s.rootDeviceUUID,
 		NotifyInterval: s.NotifyInterval,
+		Logger:         s.Logger,
 	}
 	if err := server.Init(); err != nil {
 		if i.Flags&ssdpInterfaceFlags != ssdpInterfaceFlags {

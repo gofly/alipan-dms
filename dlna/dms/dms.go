@@ -346,6 +346,7 @@ func (s *Server) ssdpInterface(i net.Interface) {
 		Server:         serverField,
 		UUID:           s.rootDeviceUUID,
 		NotifyInterval: s.NotifyInterval,
+		Logger:         s.Logger,
 	}
 	if err := server.Init(); err != nil {
 		if i.Flags&ssdpInterfaceFlags != ssdpInterfaceFlags {

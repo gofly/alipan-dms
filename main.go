@@ -29,8 +29,10 @@ func main() {
 	}
 
 	dmrServer := &dmr.Server{
-		FriendlyName: "媒体下载器",
-		Interfaces:   inters,
+		FriendlyName:  "下载到网盘",
+		Interfaces:    inters,
+		Aria2RPCAddr:  "http://127.0.0.1:6800/jsonrpc",
+		Aria2RPCToken: "zlx1989",
 		HTTPConn: func() net.Listener {
 			conn, err := net.Listen("tcp", ":8082")
 			if err != nil {
@@ -54,7 +56,7 @@ func main() {
 	dmsServer := &dms.Server{
 		FriendlyName:   "余小胖的影院",
 		Interfaces:     inters,
-		RootObjectPath: "/01-影视剧",
+		RootObjectPath: "/余小胖的影院",
 		WebdavURI:      webdavURI,
 		HTTPConn: func() net.Listener {
 			conn, err := net.Listen("tcp", ":8083")
